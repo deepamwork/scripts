@@ -1,6 +1,6 @@
 import os
 os.system("sudo apt update")
-os.system("sudo apt -y install nginx certbot python3-certbot-nginx node npm pm2")
+os.system("sudo apt -y install nginx certbot python3-certbot-nginx nodejs npm")
 repo_name=input("Enter the name of the repository: ")
 os.system(f"git clone {repo_name}")
 os.system(f"cd {repo_name}")
