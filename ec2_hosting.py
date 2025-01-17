@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import json
+import re
 
 # Define log file
 LOG_FILE = "/tmp/deployment_script.log"
@@ -70,6 +71,20 @@ def get_available_scripts():
         print("Error reading package.json.")
         return {}
 
+# Function to find the proxy pass port from running processes
+def find_proxy_pass_port():
+    # Attempt to find a Node.js app by checking which port it's listening on
+    # We'll look for ports where a node process is running
+    result = subprocess.run("sudo lsof -i -P -n | grep LISTEN", shell=True, capture_output=True, text=True)
+    if result.returncode == 0:
+        # Parse the result to find a valid proxy pass port
+        lines = result.stdout.splitlines()
+        for line in lines:
+            match = re.search(r'LISTEN\s+([0-9]+)\s+.*node', line)
+            if match:
+                return f"http://localhost:{match.group(1)}"
+    return None
+
 # Check if the script has been executed before
 if has_run_before():
     print("Script has already been executed. Exiting.")
@@ -114,11 +129,19 @@ try:
     # Step 6: Start Nginx server
     run_command("sudo systemctl start nginx")
 
-    # Step 7: Ask for the listening port and proxy pass
-    listen_port = input("Enter the port for Nginx to listen on (e.g., 8081): ").strip()
-    proxy_pass = input("Enter the proxy pass (e.g., http://localhost:3001): ").strip()
+    # Step 7: Default listen port for Nginx is 80
+    listen_port = "80"  # Set default listen port to 80
+    print(f"Nginx will listen on port {listen_port}")
 
-    # Step 8: Create Nginx configuration dynamically based on user input
+    # Step 8: Automatically find the proxy pass port
+    proxy_pass = find_proxy_pass_port()
+    if not proxy_pass:
+        print("Could not find a running Node.js process. Please provide a proxy pass manually.")
+        proxy_pass = input("Enter the proxy pass (e.g., http://localhost:3001): ").strip()
+    
+    print(f"Proxy pass set to: {proxy_pass}")
+
+    # Create Nginx configuration dynamically based on user input
     config_default = f"""server {{
   listen {listen_port}; # Listen on port {listen_port} for incoming requests
   server_name localhost; # You can change this to your domain if needed
