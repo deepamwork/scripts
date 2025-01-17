@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import json
 
 # Define log file
 LOG_FILE = "/tmp/deployment_script.log"
@@ -18,8 +19,19 @@ def log_status(status):
     with open(LOG_FILE, "w") as log:
         log.write(status)
 
+# Function to log the command execution
+def log_command(command):
+    with open(LOG_FILE, "a") as log:
+        log.write(f"Executed: {command}\n")
+
 # Function to execute system commands and check for errors
 def run_command(command):
+    # Check if the command was already executed
+    with open(LOG_FILE, "r") as log:
+        if command in log.read():
+            print(f"Command already executed: {command}")
+            return
+
     print(f"Running command: {command}")
     result = os.system(command)
     if result != 0:
@@ -27,6 +39,7 @@ def run_command(command):
         sys.exit(1)  # Exit the script on failure
     else:
         print(f"Successfully executed: {command}")
+        log_command(command)  # Log the executed command
 
 # Function to get the public IP
 def get_public_ip():
@@ -36,6 +49,20 @@ def get_public_ip():
     except subprocess.CalledProcessError:
         print("Error fetching public IP.")
         sys.exit(1)
+
+# Function to list available scripts in package.json
+def get_available_scripts():
+    try:
+        with open("package.json", "r") as f:
+            package_data = json.load(f)
+        if "scripts" in package_data:
+            return package_data["scripts"]
+        else:
+            print("No scripts found in package.json.")
+            return {}
+    except (json.JSONDecodeError, FileNotFoundError):
+        print("Error reading package.json.")
+        return {}
 
 # Check if the script has been executed before
 if has_run_before():
@@ -60,29 +87,32 @@ try:
     # Step 3: Install Node.js dependencies
     run_command("npm install")
 
-    # Step 4: Ask for the commands to run
-    user_input = input("Enter the commands to run (comma-separated, e.g., build, dev, start): ").strip()
-    commands = [cmd.strip() for cmd in user_input.split(',')]
-
-    # Execute each command based on user input
-    for cmd in commands:
-        if cmd == "build":
-            run_command("pm2 start npm --name first-backend-build -- run build")
-        elif cmd == "dev":
-            run_command("pm2 start npm --name first-backend-dev -- run dev")
-        elif cmd == "start":
-            run_command("pm2 start npm --name first-backend -- run start")
+    # Step 4: Automatically Identify Available Scripts from package.json
+    scripts = get_available_scripts()
+    if scripts:
+        print("Available scripts in package.json:")
+        for script_name in scripts:
+            print(f"- {script_name}")
+        
+        # Add each script to pm2 without starting it
+        for script_name in scripts:
+            run_command(f"pm2 start npm --name {script_name} -- run {script_name}")
+        
+        # Step 5: Ask the user which script to run
+        user_input = input(f"Which script would you like to run from the list? (e.g., build, dev, start): ").strip()
+        if user_input in scripts:
+            run_command(f"pm2 start {user_input}")
         else:
-            print(f"Unknown command: {cmd}. Skipping.")
+            print(f"Invalid script choice. Skipping script start.")
     
-    # Step 5: Start Nginx server
+    # Step 6: Start Nginx server
     run_command("sudo systemctl start nginx")
 
-    # Step 6: Ask for the listening port and proxy pass
+    # Step 7: Ask for the listening port and proxy pass
     listen_port = input("Enter the port for Nginx to listen on (e.g., 8081): ").strip()
     proxy_pass = input("Enter the proxy pass (e.g., http://localhost:3001): ").strip()
 
-    # Step 7: Create Nginx configuration dynamically based on user input
+    # Step 8: Create Nginx configuration dynamically based on user input
     config_default = f"""server {{
   listen {listen_port}; # Listen on port {listen_port} for incoming requests
   server_name localhost; # You can change this to your domain if needed
@@ -99,10 +129,10 @@ try:
     with open("/etc/nginx/sites-enabled/default", "w") as f:
         f.write(config_default)
 
-    # Step 8: Restart Nginx to apply the new config
+    # Step 9: Restart Nginx to apply the new config
     run_command("sudo systemctl restart nginx")
 
-    # Step 9: Get and print the public IP
+    # Step 10: Get and print the public IP
     public_ip = get_public_ip()
     print(f"Visit your website at {public_ip}")
 
