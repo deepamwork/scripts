@@ -8,6 +8,7 @@ LOG_FILE = "/tmp/deployment_script.log"
 
 # Function to check if the script has already been executed
 def has_run_before():
+    # Check if log file exists and is not empty
     if os.path.exists(LOG_FILE):
         with open(LOG_FILE, "r") as log:
             last_run = log.read().strip()
@@ -26,6 +27,11 @@ def log_command(command):
 
 # Function to execute system commands and check for errors
 def run_command(command):
+    # Ensure the log file exists before reading
+    if not os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "w") as log:
+            log.write("")  # Create an empty log file if it doesn't exist
+    
     # Check if the command was already executed
     with open(LOG_FILE, "r") as log:
         if command in log.read():
