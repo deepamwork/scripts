@@ -106,7 +106,7 @@ try:
     os.chdir(name_repo)
     
     # Step 3: Install Node.js dependencies
-    run_command("npm install")
+    run_command("sudo npm install")
 
     # Step 4: Automatically Identify Available Scripts from package.json
     scripts = get_available_scripts()
