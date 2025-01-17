@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 
 # Define log file
 LOG_FILE = "/tmp/deployment_script.log"
@@ -26,6 +27,15 @@ def run_command(command):
         sys.exit(1)  # Exit the script on failure
     else:
         print(f"Successfully executed: {command}")
+
+# Function to get the public IP
+def get_public_ip():
+    try:
+        result = subprocess.check_output(["curl", "-s", "ifconfig.me"])
+        return result.decode('utf-8').strip()
+    except subprocess.CalledProcessError:
+        print("Error fetching public IP.")
+        sys.exit(1)
 
 # Check if the script has been executed before
 if has_run_before():
@@ -91,6 +101,10 @@ try:
 
     # Step 8: Restart Nginx to apply the new config
     run_command("sudo systemctl restart nginx")
+
+    # Step 9: Get and print the public IP
+    public_ip = get_public_ip()
+    print(f"Visit your website at {public_ip}")
 
     # Mark script as completed
     log_status("completed")
